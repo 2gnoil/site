@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>t.g.n.::oil</title>
+  <!-- jsmediatags library for audio metadata -->
+  <script src="https://cdn.jsdelivr.net/npm/jsmediatags@3.8.0/dist/jsmediatags.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+
+  body {
+    background: #f4f4f4;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding-top: 5%;
+    color: #333;
+  }
+
+  .container {
+    max-width: 500px;    /* limit width */
+    margin: 0 auto;      /* center horizontally */
+    text-align: center;    /* optional: left-align text inside */
+  }
+
+  h1 {
+    font-size: 3rem;
+    text-align: center;  /* re-center the title */
+  }
+
+  p {
+    font-size: 1.3rem;
+  }
+
+#category-bar {
+  margin-bottom: 4px;
+margin-top: 8px;
+}
+
+.filter-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-right: 10px;
+  font: inherit;
+  color: #0000EE;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.filter-link:hover {
+  color: #0000EE;
+}
+
+.filter-link.active {
+  font-weight: bold;
+  text-decoration: none;
+  color: #000;
+}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>t.g.n.::oil</h1>
+    writing::<br>
+    <a href="pubs/20250606_TheFourHumours.pdf">20250606_TheFourHumours.pdf</a> 
+    // <a href="pubs/20250530_AGridThroughWhichLightComes.pdf">20250530_AGridThroughWhichLightComes.pdf</a> 
+    // <a href="pubs/20241117_Apophasis.pdf">20241117_Apophasis.pdf</a> 
+    // <a href="pubs/20241114_ToStemTheTideOfDays.pdf">20241114_ToStemTheTideOfDays.pdf</a>
+    <br><br>
+    games::<br> 
+    <a href="https://tgnoil.github.io/dark-inventions">Dark Inventions (demo)</a>
+    // <a href="https://tgnoil.github.io/enochian-chess/">Enochian Chess</a>
+    // <a href="https://tgnoil.github.io/hexadeck">hexadeck</a>
+    // <a href="https://tgnoil.github.io/kcjfchess">KingCobraJFChess</a>
+
+    <br><br>
+    tools::<br>
+    <a href="https://github.com/tgnoil/audio-player/">Audio Player</a> 
+    // <a href="https://tgnoil.github.io/x-timeline-viewer/">X Timeline Viewer</a> 
+    // <a href="https://tgnoil.github.io/metal-archives-scraper/">Metal Archives Hub</a> 
+    
+    
+    <br><br><br>
+    <audio-player folder="./music/"></audio-player>
+    <br>
+<div id="blog-viewer">
+
+  <!-- 1. BLOG TEXT BOX -->
+  <div id="blog-box" style="border:2px solid #ccc; padding:10px; width:100%; max-width:500px; height:120px; overflow:auto; white-space:pre-wrap; font-family:monospace; text-align: left; box-sizing: border-box; margin: 0 auto;"></div>
+
+  <!-- 2. CATEGORY BAR -->
+  <div id="category-bar"></div>
+
+  <!-- 3. NAV BUTTONS -->
+  <div style="margin-top:10px; display:flex; gap:10px; justify-content: center;">
+    <button id="prev-btn">&lt;</button>
+    <button id="random-btn">random</button> 
+    <button id="next-btn">&gt;</button>
+  </div>
+
+</div>
+    
+  </div>
+
+<script>
+  class AudioPlayer extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({mode: 'open'});
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host { 
+            display: block; 
+            width: 100%; 
+            max-width: 500px; 
+            margin: 0 auto 20px auto; 
+            padding: 0 !important; 
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            position: relative;
+          }
+          #ui { 
+            width: 100%; 
+            padding: 0;
+            box-sizing: border-box;
+          }
+          #controls { 
+            background: #333; 
+            color: white; 
+            padding: 6px 4px;  /* LEFT nudge: 8px→4px */
+            display: flex; 
+            gap: 6px; 
+            align-items: center; 
+            height: 44px; 
+            box-sizing: border-box;
+            width: 100%; 
+            justify-content: flex-start;
+          }
+          #playlist { 
+            position: absolute; 
+            top: 100%; 
+            left: 0; 
+            right: 0; 
+            max-height: 300px; 
+            overflow-y: auto; 
+            border: 1px solid #ccc; 
+            background: white;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            width: 100%; 
+            box-sizing: border-box;
+          }
+          #playlist.show { 
+            opacity: 1; 
+            visibility: visible; 
+          }
+          .track { 
+            font-size: 0.85rem;
+            padding: 8px 12px 8px 8px; 
+            cursor: pointer; 
+            border-bottom: 1px solid #d3d3d3; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis;
+            text-align: left; /* LEFT ALIGN */
+            color: #333; /* DARK TEXT */
+          }
+          .track:hover { background: #f5f5f5; }
+          .track.active { background: #007cba; color: white; }
+          .artist-album {
+            font-size: 0.85rem; 
+            font-weight: bold; 
+            background: #f0f0f0; 
+            padding: 8px 12px 8px 8px; /* MATCH TRACK PADDING */
+            text-align: left; /* LEFT ALIGN */
+            color: #333; /* DARK TEXT */
+          }
+          .artist-album:hover { background: #e0e0e0; }
+          
+          /* TEXT ELEMENTS */
+          #nowPlaying {
+            font-size: 0.85rem;
+            min-width: 170px;
+            max-width: 170px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-left: 4px;
+          }
+          #currentTrack {
+            font-size: 0.8rem;
+            min-width: 80px;
+          }
+          
+          /* SEEK BAR */
+          #seek {
+            width: 80px !important;
+            height: 20px;
+            flex-shrink: 0;
+          }
+          
+          /* UNIFORM BUTTONS - ALL SAME SIZE/COLOR */
+          button {
+            height: 32px !important;
+            min-width: 32px !important;
+            width: auto !important;
+            padding: 0 10px !important;
+            margin: 0 !important;
+            font-size: 14px !important;
+            border: none !important;
+            border-radius: 3px !important;
+            background: #555 !important;
+            color: white !important;
+            cursor: pointer !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+          }
+          button:hover {
+            background: #777 !important;
+          }
+          button:disabled {
+            background: #333 !important;
+            cursor: not-allowed !important;
+          }
+          
+          /* SPECIFIC BUTTON SIZES */
+          #playPause {
+            width: 36px !important;
+            height: 32px !important;
+            padding: 0 !important;
+          }
+          #prevTrack, #nextTrack {
+            width: 32px !important;
+            height: 32px !important;
+            padding: 0 !important;
+          }
+          #togglePlaylist {
+            width: 36px !important;
+            height: 32px !important;
+            padding: 0 !important;
+            margin-right: 4px !important;
+          }
+        </style>
+
+
+        <div id="ui">
+          <div id="controls">
+            <button id="playPause" style="width: 36px; height: 32px; padding: 0;">▶</button>
+            <span id="currentTrack" style="min-width: 70px;"></span>
+            <span id="nowPlaying" style="min-width: 170px; max-width: 170px;"></span>
+            <input type="range" id="seek" min="0" max="100" value="0" style="width: 80px; flex-shrink: 0;">
+            <button id="prevTrack" style="width: 32px;">‹</button>
+            <button id="nextTrack" style="width: 32px;">›</button>
+            <button id="togglePlaylist" style="width: 36px;">▼</button>
+          </div>
+
+
+
+          <audio id="audio" preload="metadata"></audio>
+          <div id="playlist"></div>
+        </div>`;
+
+    this.audio = this.shadowRoot.querySelector('#audio');
+    this.currentTrack = null;
+    this.tracks = [];
+    this.playPauseBtn = this.shadowRoot.querySelector('#playPause');
+    this.currentTrackEl = this.shadowRoot.querySelector('#currentTrack');
+    this.nowPlayingEl = this.shadowRoot.querySelector('#nowPlaying');
+    this.playlistEl = this.shadowRoot.querySelector('#playlist');        // MOVED UP
+    this.toggleBtn = this.shadowRoot.querySelector('#togglePlaylist');   // AFTER playlistEl
+    this.seekEl = this.shadowRoot.querySelector('#seek');
+    this.prevBtn = this.shadowRoot.querySelector('#prevTrack');
+    this.nextBtn = this.shadowRoot.querySelector('#nextTrack');
+    // NOW SAFE - playlistEl exists
+    this.isPlaylistOpen = false;
+    this.audio.volume = 0.8; // Default volume
+
+    }
+
+    connectedCallback() {
+    const folder = this.getAttribute('folder');
+    this.loadTracks(folder);
+
+    this.playPauseBtn.addEventListener('click', () => this.togglePlay());
+    this.audio.addEventListener('timeupdate', () => this.updateSeek());
+    this.audio.addEventListener('loadedmetadata', () => {
+        this.seekEl.max = isNaN(this.audio.duration) ? 0 : this.audio.duration;
+        this.seekEl.value = 0;
+        this.currentTrackEl.textContent = `0:00 / ${this.formatTime(this.audio.duration)}`;
+    });
+    this.audio.addEventListener('ended', () => this.nextTrack());
+    
+    this.seekEl.addEventListener('input', (e) => {
+        this.audio.currentTime = Number(e.target.value) || 0;
+    });
+    
+
+    // NEW: Playlist toggle - STANDALONE listener (moved OUTSIDE volumeEl)
+    this.toggleBtn.addEventListener('click', () => {
+      if (this.isPlaylistOpen) {
+        this.playlistEl.classList.remove('show');  // CHANGED
+        this.toggleBtn.textContent = '▼';
+        this.isPlaylistOpen = false;
+      } else {
+        this.playlistEl.classList.add('show');     // CHANGED
+        this.toggleBtn.textContent = '▲';
+        this.isPlaylistOpen = true;
+      }
+    });
+
+
+
+    // NEW: Previous/Next track buttons
+    this.prevBtn.addEventListener('click', () => {
+    const currentIndex = this.tracks.findIndex(t => t.url === this.currentTrack);
+    if (currentIndex > 0) {
+        const prev = this.tracks[currentIndex - 1];
+        const prevEl = this.playlistEl.querySelector(`.track[data-url="${prev.url.replace(/"/g, '\\"')}"]`);
+        this.playTrack(prev.url, prevEl);
+    }
+    });
+
+    this.nextBtn.addEventListener('click', () => this.nextTrack());
+
+
+    }
+
+
+    // FIXED: Regex without problematic non-capturing group
+    parseFilename(filename) {
+    // Remove extension FIRST if present
+    const cleanName = filename.replace(/\.(mp3|flac)$/i, '');
+    const parts = cleanName.split(' - ').map(p => p.trim());
+    
+    console.log('Parsing cleanName:', cleanName, 'parts:', parts); // Debug
+    
+    if (parts.length === 5 && /^\d{4}-\d{2}-\d{2}$/.test(parts[0])) {
+        const date = new Date(parts[0]);
+        if (!isNaN(date.getTime())) {
+        return {
+            date: parts[0],
+            artist: parts[1],
+            album: parts[2],
+            trackNum: parseInt(parts[3]) || 0,
+            title: parts[4],
+            displayTitle: parts[4]
+        };
+        }
+    }
+    
+    console.warn('Parse failed for:', filename);
+    return { 
+        date: '0000-00-00', artist: 'Unknown', album: 'Unknown', 
+        title: cleanName, trackNum: 0, displayTitle: cleanName 
+    };
+    }
+
+
+  async loadTracks(folder) {
+    try {
+      // Use GitHub API to fetch /music/ folder contents dynamically
+      const repo = 'tgnoil/site';  // YOUR REPO
+      const branch = 'main';
+      const path = 'music';  // Folder path in repo
+      
+      const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`GitHub API failed: ${response.status}`);
+      }
+      
+      const files = await response.json();
+      
+      // Filter for MP3/FLAC files only
+      const audioFiles = files.filter(file => 
+        file.name.match(/\.(mp3|flac)$/i)
+      );
+      
+      const tracks = audioFiles.map(file => {
+        const decodedFilename = decodeURIComponent(file.name);
+        const parsed = this.parseFilename(decodedFilename);
+        return {
+          url: file.download_url,  // Direct download URL from GitHub
+          filename: decodedFilename,
+          ...parsed
+        };
+      });
+  
+      // Fallback if no audio files
+      if (tracks.length === 0) {
+        tracks.push({
+          url: './music/2025-01-13%20-%20flat%20broke%20-%201111%20-%2001%20-%20cozumel%20%28ext%29.mp3',
+          filename: '2025-01-13 - flat broke - 1111 - 01 - cozumel (ext).mp3',
+          date: '2025-01-13', artist: 'flat broke', album: '1111',
+          trackNum: 1, title: 'cozumel (ext)', displayTitle: 'cozumel (ext)'
+        });
+      }
+  
+      this.tracks = tracks;
+      
+      // Same album sorting logic
+      const albumDates = {};
+      this.tracks.forEach(t => {
+        const key = `${t.artist}|${t.album}`;
+        if (!albumDates[key] || t.date < albumDates[key]) {
+          albumDates[key] = t.date;
+        }
+      });
+      this.tracks.forEach(t => {
+        const key = `${t.artist}|${t.album}`;
+        t.albumDate = albumDates[key];
+      });
+      
+      this.sortTracks();
+      this.renderPlaylist();
+  
+      // Auto-load first track
+      if (this.tracks.length > 0) {
+        const firstTrack = this.tracks[0];
+        this.currentTrack = firstTrack.url;
+        this.nowPlayingEl.textContent = `${firstTrack.artist} - ${firstTrack.title}`;
+        this.audio.src = firstTrack.url;
+        this.playPauseBtn.textContent = '▶';
+        this.currentTrackEl.textContent = '0:00 / 0:00';
+      }
+    } catch (e) {
+      console.error('Could not load tracks:', e);
+    }
+  }
+
+
+
+    sortTracks() {
+    this.tracks.sort((a, b) => {
+        // 1. PRIMARY: Album date (newest first) ⭐ CHANGED
+        if (a.albumDate !== b.albumDate) {
+        return b.albumDate.localeCompare(a.albumDate);
+        }
+        
+        // 2. SECONDARY: Album (alphabetical)
+        if (a.album !== b.album) {
+        return a.album.localeCompare(b.album);
+        }
+        
+        // 3. TERTIARY: Track number
+        return a.trackNum - b.trackNum;
+    });
+    }
+
+
+
+
+
+    renderPlaylist() {
+    const wasOpen = this.isPlaylistOpen;
+    const currentMaxHeight = this.playlistEl.style.maxHeight;
+    // ⭐ SURGICAL INSERTION #3: Group by albumDate instead of track date
+    const sortedGroups = Object.values(
+    this.tracks.reduce((acc, t) => {
+        const key = `${t.artist}|${t.album}`;
+        if (!acc[key]) {
+        acc[key] = { 
+            artist: t.artist, 
+            album: t.album, 
+            albumDate: t.albumDate,  // ⭐ Use albumDate
+            tracks: [] 
+        };
+        }
+        acc[key].tracks.push(t);
+        return acc;
+    }, {})
+    ).sort((a, b) => b.albumDate.localeCompare(a.albumDate));  // ⭐ Sort by albumDate
+
+    
+    let html = '';
+    sortedGroups.forEach(group => {
+        html += `<div class="track artist-album">${group.artist} - ${group.album}</div>`;
+        group.tracks.forEach(track => {
+        html += `<div class="track" data-url="${track.url}">${track.displayTitle}</div>`;
+        });
+    });
+    
+    this.playlistEl.innerHTML = html;
+    // Track clicks (existing)
+    this.playlistEl.querySelectorAll('.track:not(.artist-album)').forEach(el => {
+    el.addEventListener('click', () => this.playTrack(el.dataset.url, el));
+    });
+
+    // NEW: Album row clicks → play first track in that album
+    this.playlistEl.querySelectorAll('.artist-album').forEach(albumEl => {
+    albumEl.style.cursor = 'pointer';
+    albumEl.addEventListener('click', (e) => {
+        const firstTrackEl = albumEl.nextElementSibling;
+        if (firstTrackEl && firstTrackEl.dataset.url) {
+        this.playTrack(firstTrackEl.dataset.url, firstTrackEl);
+        }
+    });
+    });
+    // Restore state after render
+    if (wasOpen) {
+      this.playlistEl.classList.add('show');      // CHANGED
+      this.toggleBtn.textContent = '▲';
+    } else {
+      this.playlistEl.classList.remove('show');   // CHANGED
+      this.toggleBtn.textContent = '▼';
+    }
+    this.isPlaylistOpen = wasOpen;
+
+
+    }
+
+
+    groupByArtistAlbum() {
+      const grouped = {};
+      this.tracks.forEach(track => {
+        if (!grouped[track.artist]) grouped[track.artist] = {};
+        if (!grouped[track.artist][track.album]) grouped[track.artist][track.album] = [];
+        grouped[track.artist][track.album].push(track);
+      });
+      return grouped;
+    }
+
+    async playTrack(url, el) {
+    const track = this.tracks.find(t => t.url === url);
+    this.currentTrack = url;
+    
+    // NEW: Update now playing display
+    if (this.nowPlayingEl && track) {
+        this.nowPlayingEl.textContent = `${track.artist} - ${track.title}`;
+    }
+    
+    this.seekEl.value = 0;
+    this.seekEl.max = 0;
+    this.currentTrackEl.textContent = '0:00 / 0:00';
+
+    this.audio.src = url;
+    await this.audio.load();
+    await this.audio.play();
+
+    this.updateActiveTrack(el);
+    this.playPauseBtn.textContent = '⏸';
+    }
+
+togglePlay() {
+  if (this.audio.paused && this.currentTrack) {
+    this.audio.play();
+    this.playPauseBtn.textContent = '⏸';
+  } else if (!this.audio.paused) {
+    this.audio.pause();
+    this.playPauseBtn.textContent = '▶';
+  }
+}
+
+
+
+    updateSeek() {
+      if (!isNaN(this.audio.currentTime)) {
+        this.seekEl.value = this.audio.currentTime;
+      }
+      this.currentTrackEl.textContent = `${this.formatTime(this.audio.currentTime)} / ${this.formatTime(this.audio.duration)}`;
+    }
+
+    updateActiveTrack(activeEl) {
+      this.playlistEl.querySelectorAll('.track.active').forEach(el => el.classList.remove('active'));
+      if (activeEl) activeEl.classList.add('active');
+    }
+
+    nextTrack() {
+      const currentIndex = this.tracks.findIndex(t => t.url === this.currentTrack);
+      if (currentIndex < this.tracks.length - 1) {
+        const next = this.tracks[currentIndex + 1];
+        const nextEl = this.playlistEl.querySelector(`.track[data-url="${next.url.replace(/"/g, '\\"')}"]`);
+        this.playTrack(next.url, nextEl);
+      } else {
+        this.audio.pause();
+        this.audio.currentTime = 0;
+        this.seekEl.value = 0;
+        this.currentTrackEl.textContent = '0:00 / 0:00';
+        this.playPauseBtn.textContent = '▶';
+      }
+    }
+
+    formatTime(seconds) {
+      if (isNaN(seconds)) return '0:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+  }
+
+  customElements.define('audio-player', AudioPlayer);
+</script>
+
+
+
+<script>
+let allEntries = [];   // full dataset
+let entries = [];      // filtered dataset
+let currentIndex = 0;
+let categories = [];
+let currentFilter = "all";
+
+const box = document.getElementById("blog-box");
+const prevBtn = document.getElementById("prev-btn");
+const nextBtn = document.getElementById("next-btn");
+const randomBtn = document.getElementById("random-btn");
+const categoryBar = document.getElementById("category-bar");
+
+const VISIBLE_CATEGORIES = [
+  "poetry",
+  "fiction",
+  "essays",
+  "musings",
+  "funny"
+  // add/remove whatever you want
+];
+
+function showEntry(index) {
+  if (index < 0 || index >= entries.length) return;
+  currentIndex = index;
+
+  prevBtn.disabled = (currentIndex === 0);
+  nextBtn.disabled = (currentIndex === entries.length - 1);
+  randomBtn.disabled = (entries.length === 0);
+
+  const entry = entries[currentIndex];
+  box.textContent = entry.text;
+  box.scrollTop = 0;
+}
+
+function applyFilter(category) {
+  currentFilter = category;
+
+  if (category === "all") {
+    entries = allEntries.filter(e => e.isBlog);
+  } else {
+    entries = allEntries.filter(e => 
+      e.isBlog && e.categories.includes(category)
+    );
+  }
+
+  // update active styling
+  updateActiveFilterUI();
+
+  if (entries.length === 0) {
+    box.textContent = "No entries for this category.";
+    return;
+  }
+
+  entries.sort((a, b) => b.date.localeCompare(a.date));
+  showEntry(0);
+}
+
+function updateActiveFilterUI() {
+  const links = document.querySelectorAll(".filter-link");
+
+  links.forEach(link => {
+    if (link.dataset.category === currentFilter) {
+      link.classList.add("active");
+    } else {
+      link.classList.remove("active");
+    }
+  });
+}
+
+function renderCategoryButtons() {
+  categoryBar.innerHTML = "";
+
+  function createLink(label, category) {
+    const link = document.createElement("button");
+    link.textContent = label;
+    link.className = "filter-link";
+    link.dataset.category = category;
+
+    link.onclick = () => applyFilter(category);
+
+    return link;
+  }
+
+  // ALL
+  categoryBar.appendChild(createLink("all", "all"));
+
+  const filteredCategories = categories.filter(cat => 
+    VISIBLE_CATEGORIES.includes(cat)
+  );
+
+  filteredCategories.forEach(cat => {
+    categoryBar.appendChild(createLink(cat, cat));
+  });
+
+  updateActiveFilterUI(); // initialize
+}
+
+async function initBlogViewer() {
+  try {
+    const response = await fetch("!repo.csv"); // ← make sure filename is correct
+    
+    if (!response.ok) {
+      box.textContent = "Could not load CSV file";
+      return;
+    }
+
+    const csvText = await response.text();
+
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true
+    });
+
+const headers = parsed.meta.fields;
+
+// Define non-category fields
+const excluded = ["Text", "date"];
+
+// Everything else is a category
+categories = headers.filter(h => !excluded.includes(h));
+
+    // Build dataset
+allEntries = parsed.data.map(row => {
+  const entryCategories = categories.filter(cat => row[cat]?.trim() === "x");
+
+  return {
+    date: row.date?.trim(),
+    text: (row.date?.trim() || "") + "\n" + (row.Text || ""),
+    categories: entryCategories,
+    isBlog: row.blog?.trim() === "x"
+  };
+});
+    // Default: blog entries only (your original behavior)
+entries = allEntries.filter(e => e.isBlog);
+
+    if (entries.length === 0) {
+      box.textContent = "No blog entries found.";
+      return;
+    }
+
+    entries.sort((a, b) => b.date.localeCompare(a.date));
+
+    renderCategoryButtons();  // ← add buttons
+    showEntry(0);
+
+  } catch (e) {
+    box.textContent = "Error: " + e.message;
+  }
+}
+
+prevBtn.addEventListener("click", () => showEntry(currentIndex - 1));
+nextBtn.addEventListener("click", () => showEntry(currentIndex + 1));
+randomBtn.addEventListener("click", () => {
+  if (entries.length > 0) {
+    const randomIndex = Math.floor(Math.random() * entries.length);
+    showEntry(randomIndex);
+  }
+});
+
+initBlogViewer();
+</script>
+  
+</body>
+</html>
+
+
+
+
