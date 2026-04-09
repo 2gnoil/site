@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>t.g.n.::oil</title>
+  <title>2.g.n.::oil</title>
   <!-- jsmediatags library for audio metadata -->
   <script src="https://cdn.jsdelivr.net/npm/jsmediatags@3.8.0/dist/jsmediatags.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -60,7 +60,7 @@ margin-top: 8px;
 </head>
 <body>
   <div class="container">
-    <h1>t.g.n.::oil</h1>
+    <h1>2.g.n.::oil</h1>
     writing::<br>
     <a href="pubs/20250606_TheFourHumours.pdf">20250606_TheFourHumours.pdf</a> 
     // <a href="pubs/20250530_AGridThroughWhichLightComes.pdf">20250530_AGridThroughWhichLightComes.pdf</a> 
@@ -68,16 +68,16 @@ margin-top: 8px;
     // <a href="pubs/20241114_ToStemTheTideOfDays.pdf">20241114_ToStemTheTideOfDays.pdf</a>
     <br><br>
     games::<br> 
-    <a href="https://tgnoil.github.io/dark-inventions">Dark Inventions (demo)</a>
-    // <a href="https://tgnoil.github.io/enochian-chess/">Enochian Chess</a>
-    // <a href="https://tgnoil.github.io/hexadeck">hexadeck</a>
-    // <a href="https://tgnoil.github.io/kcjfchess">KingCobraJFChess</a>
+    <a href="https://2gnoil.github.io/dark-inventions">Dark Inventions (demo)</a>
+    // <a href="https://2gnoil.github.io/enochian-chess/">Enochian Chess</a>
+    // <a href="https://2gnoil.github.io/hexadeck">hexadeck</a>
+    // <a href="https://2gnoil.github.io/kcjfchess">KingCobraJFChess</a>
 
     <br><br>
     tools::<br>
-    <a href="https://github.com/tgnoil/audio-player/">Audio Player</a> 
-    // <a href="https://tgnoil.github.io/x-timeline-viewer/">X Timeline Viewer</a> 
-    // <a href="https://tgnoil.github.io/metal-archives-scraper/">Metal Archives Hub</a> 
+    <a href="https://github.com/2gnoil/audio-player/">Audio Player</a> 
+    // <a href="https://2gnoil.github.io/x-timeline-viewer/">X Timeline Viewer</a> 
+    // <a href="https://2gnoil.github.io/metal-archives/">Metal Archives Hub</a> 
     
     
     <br><br><br>
@@ -178,6 +178,18 @@ margin-top: 8px;
             color: #333; /* DARK TEXT */
           }
           .artist-album:hover { background: #e0e0e0; }
+          .new-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: bold;
+            color: white;
+            background: #c0392b;
+            border-radius: 3px;
+            padding: 1px 4px;
+            margin-left: 6px;
+            vertical-align: middle;
+            letter-spacing: 0.03em;
+          }
           
           /* TEXT ELEMENTS */
           #nowPlaying {
@@ -363,7 +375,7 @@ margin-top: 8px;
   async loadTracks(folder) {
     try {
       // Use GitHub API to fetch /music/ folder contents dynamically
-      const repo = 'tgnoil/site';  // YOUR REPO
+      const repo = '2gnoil/site';  // YOUR REPO
       const branch = 'main';
       const path = 'music';  // Folder path in repo
       
@@ -407,7 +419,7 @@ margin-top: 8px;
       const albumDates = {};
       this.tracks.forEach(t => {
         const key = `${t.artist}|${t.album}`;
-        if (!albumDates[key] || t.date > albumDates[key]) {
+        if (!albumDates[key] || t.date < albumDates[key]) {
           albumDates[key] = t.date;
         }
       });
@@ -477,11 +489,17 @@ margin-top: 8px;
     ).sort((a, b) => b.albumDate.localeCompare(a.albumDate));  // ⭐ Sort by albumDate
 
     
+    const now = new Date();
+    const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+    const isNew = (dateStr) => dateStr && new Date(dateStr) >= cutoff;
+    const newBadge = `<span class="new-badge">NEW</span>`;
+
     let html = '';
     sortedGroups.forEach(group => {
-        html += `<div class="track artist-album">${group.artist} - ${group.album}</div>`;
+        const albumHasNew = group.tracks.some(t => isNew(t.date));
+        html += `<div class="track artist-album">${group.artist} - ${group.album}${albumHasNew ? newBadge : ''}</div>`;
         group.tracks.forEach(track => {
-        html += `<div class="track" data-url="${track.url}">${track.displayTitle}</div>`;
+        html += `<div class="track" data-url="${track.url}">${track.displayTitle}${isNew(track.date) ? newBadge : ''}</div>`;
         });
     });
     
@@ -594,6 +612,7 @@ togglePlay() {
   }
 
   customElements.define('audio-player', AudioPlayer);
+
 </script>
 
 
@@ -614,7 +633,6 @@ const categoryBar = document.getElementById("category-bar");
 const VISIBLE_CATEGORIES = [
   "poetry",
   "fiction",
-  "essays",
   "musings",
   // add/remove whatever you want
 ];
