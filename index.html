@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>2.g.n.::oil</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
@@ -11,13 +12,18 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding-top: 5%;
+      padding-left: 12px;
+      padding-right: 12px;
       color: #333;
+      box-sizing: border-box;
     }
 
     .container {
       max-width: 500px;
+      width: 100%;
       margin: 0 auto;
       text-align: center;
+      box-sizing: border-box;
     }
 
     h1 {
@@ -38,8 +44,9 @@
       background: none;
       border: none;
       padding: 0;
-      margin-right: 10px;
+      margin-right: 8px;
       font: inherit;
+      font-size: 1rem;
       color: #0000EE;
       cursor: pointer;
       text-decoration: underline;
@@ -344,10 +351,22 @@
             font-size: 0.85rem;
             flex: 1;
             min-width: 0;
-            white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis;
             margin-left: 4px;
+            position: relative;
+          }
+          #nowPlaying .scroll-inner {
+            display: inline-block;
+            white-space: nowrap;
+          }
+          #nowPlaying.scrolling .scroll-inner {
+            animation: marquee 12s linear infinite;
+          }
+          @keyframes marquee {
+            0%   { transform: translateX(0); }
+            20%  { transform: translateX(0); }
+            80%  { transform: translateX(var(--scroll-dist)); }
+            100% { transform: translateX(var(--scroll-dist)); }
           }
           #currentTime {
             font-size: 0.8rem;
@@ -422,6 +441,12 @@
           #fullscreen-btn:hover,
           #newtab-btn:hover { background: rgba(0,0,0,0.85) !important; color: white !important; }
 
+          /* Always show both buttons when in fullscreen */
+          #display:fullscreen #fullscreen-btn,
+          #display:fullscreen #newtab-btn,
+          #display:-webkit-full-screen #fullscreen-btn,
+          #display:-webkit-full-screen #newtab-btn { opacity: 1; }
+
           #display:fullscreen,
           #display:-webkit-full-screen {
             background: #000;
@@ -460,7 +485,7 @@
           <div id="controls">
             <button id="playPause">▶</button>
             <span id="currentTime" style="min-width:70px;">0:00 / 0:00</span>
-            <span id="nowPlaying"></span>
+            <span id="nowPlaying"><span class="scroll-inner"></span></span>
             <input type="range" id="seek" min="0" max="100" value="0">
             <button id="prevItem">‹</button>
             <button id="nextItem">›</button>
@@ -557,7 +582,9 @@
         this.seekEl.disabled       = !needsPlayback;
         this.playPauseBtn.textContent = '▶';
         this.currentTimeEl.textContent = '0:00 / 0:00';
-        this.nowPlayingEl.textContent   = '';
+        const inner = this.nowPlayingEl.querySelector('.scroll-inner');
+        inner.textContent = '';
+        this.nowPlayingEl.classList.remove('scrolling');
         this.seekEl.value = 0;
         this.seekEl.max   = 100;
 
@@ -791,11 +818,20 @@
         const item = this.items[idx];
 
         // Update now-playing label
-        if (this.mode === 'music') {
-          this.nowPlayingEl.textContent = `${item.artist} - ${item.title}`;
-        } else {
-          this.nowPlayingEl.textContent = item.label;
-        }
+        const label = (this.mode === 'music')
+          ? `${item.artist} - ${item.title}`
+          : item.label;
+        const inner = this.nowPlayingEl.querySelector('.scroll-inner');
+        inner.textContent = label;
+        this.nowPlayingEl.classList.remove('scrolling');
+        // Check overflow after a brief paint delay
+        requestAnimationFrame(() => {
+          const overflow = inner.scrollWidth - this.nowPlayingEl.clientWidth;
+          if (overflow > 2) {
+            this.nowPlayingEl.style.setProperty('--scroll-dist', `-${overflow + 16}px`);
+            this.nowPlayingEl.classList.add('scrolling');
+          }
+        });
 
         this.seekEl.value = 0;
 
@@ -957,20 +993,25 @@
       ══════════════════════════════════════════ */
       handleFullscreen() {
         if (this.mode === 'pubs') {
-          // Open PDF in new tab instead of fullscreening the iframe
           const item = this.items[this.currentIndex];
           if (item) window.open(item.url, '_blank');
           return;
         }
-        const el = this.displayEl;
-        if (el.requestFullscreen)       el.requestFullscreen();
-        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        if (isFs) {
+          if (document.exitFullscreen)       document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        } else {
+          const el = this.displayEl;
+          if (el.requestFullscreen)            el.requestFullscreen();
+          else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        }
       }
 
       onFullscreenChange() {
-        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-        this.fullscreenBtn.textContent = fsEl ? '✕' : '⛶';
-        this.fullscreenBtn.title       = fsEl ? 'Exit fullscreen' : 'Fullscreen';
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        this.fullscreenBtn.textContent = isFs ? '✕' : '⛶';
+        this.fullscreenBtn.title       = isFs ? 'Exit fullscreen' : 'Fullscreen';
       }
 
       /* ══════════════════════════════════════════
